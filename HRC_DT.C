@@ -13,7 +13,7 @@ using std::vector;
 using std::cerr;
 using std::endl;
 
-#define NUMPOINTS 100
+#define NUMPOINTS 10
 #define DIM 2
 
 struct Pair {
@@ -404,14 +404,12 @@ CLEAP_RESULT load_mesh_host(const int pop, float* slabs, _cleap_mesh *m, Delauna
 
   //parse vertex data
   int count = 0;
-  for(int i = 0; i < (pop+3); i++) {
+  for(int i = 0; i < m->vertex_count; i++) {
     m->vnc_data.v[count].x = slabs[2*i];
     m->vnc_data.v[count].y = slabs[2*i+1];
-    m->vnc_data.v[count].z = 1; //only doing 2D for now
+    m->vnc_data.v[count].z = 0; //only doing 2D for now
     count++;
-  }
-
-  for(int i = 0; i < m->vertex_count; i++) {
+   
     m->vnc_data.v[i].w = 1.0f;
 
     // normals
@@ -495,15 +493,18 @@ int main(int argc, char* argv[])
     if(_cleap_device_load_mesh(m) != CLEAP_SUCCESS) {
       fprintf(stderr, "Failed to load mesh on device"); 
       exit(-1);
-    }
+    } 
+dt.VerifyResults(slabs, pop);
+    //m = cleap_load_mesh("chair_0001.off");
     if(cleap_delaunay_transformation(m, CLEAP_MODE_2D) != CLEAP_SUCCESS) {
       fprintf(stderr, "Failed to run Delaunay"); 
       exit(-1);
     }
+
     if(i == 0) 
       cleap_save_mesh(m, "outMesh.off");
    
-    //dt.VerifyResults(slabs, pop); //error check
+    dt.VerifyResults(slabs, pop); //error check
     //clear out vectors for next round
     dt.Clear();
     cleap_clear_mesh(m);
