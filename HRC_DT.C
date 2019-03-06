@@ -13,7 +13,7 @@ using std::vector;
 using std::cerr;
 using std::endl;
 
-#define NUMPOINTS 10
+#define NUMPOINTS 100
 #define DIM 2
 
 struct Pair {
