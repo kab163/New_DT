@@ -23,4 +23,4 @@ gpu: $(SRCcu)
 	nvcc -arch=sm_35 $(SRCcu) -o gpu -L$(INSTALL)/lib -I$(INSTALL)/include/cleap-0.3.2 -lcleap
 
 clean:
-	rm v3
+	rm v3 output.off

@@ -13,8 +13,15 @@ using std::vector;
 using std::cerr;
 using std::endl;
 
-#define NUMPOINTS 100
+#define NUMPOINTS 10
 #define DIM 2
+
+#define X1 -1 
+#define Y1 -1
+#define X2 2 
+#define Y2 -1
+#define X3 .5 
+#define Y3 2
 
 struct Pair {
   float x;
@@ -467,6 +474,56 @@ CLEAP_RESULT load_mesh_host(const int pop, float* slabs, _cleap_mesh *m, Delauna
 
   return CLEAP_SUCCESS;
 }
+
+CLEAP_RESULT DelBoundingTri(_cleap_mesh *m, DelaunayTriangulation dt, const int pop) { 
+  int v_count, f_count, e_count;
+  v_count = m->vertex_count;
+  f_count = m->face_count;
+  e_count = m->edge_count;
+
+  //sync mesh so that all values are updated
+  cleap_sync_mesh(m);
+
+  setlocale(LC_NUMERIC, "POSIX");
+  FILE *off = fopen("outputMesh.off", "w");
+
+  for(int i = 0; i < m->face_count; i++) {
+    if(m->triangles[3*i] == pop || m->triangles[3*i] == pop+1 || m->triangles[3*i] == pop+2) { 
+      m->triangles[3*i] = -1; m->triangles[3*i+1] = -1; m->triangles[3*i+2] = -1; //delete this triangle
+      f_count--; //subtract one from face count 
+    } else if(m->triangles[3*i+1] == pop || m->triangles[3*i+1] == pop+1 || m->triangles[3*i+1] == pop+2) {
+      m->triangles[3*i] = -1; m->triangles[3*i+1] = -1; m->triangles[3*i+2] = -1; //delete this triangle
+      f_count--; //subtract one from face count 
+    } else if(m->triangles[3*i+2] == pop || m->triangles[3*i+2] == pop+1 || m->triangles[3*i+2] == pop+2) {
+      m->triangles[3*i] = -1; m->triangles[3*i+1] = -1; m->triangles[3*i+2] = -1; //delete this triangle
+      f_count--; //subtract one from face count 
+    } 
+  }
+
+  //no longer have boundary triangle, subtract the vertices
+  v_count-=3;
+
+  //calculate new number of edges
+  e_count = v_count + f_count -2;
+
+  fprintf(off,"OFF\n");
+  fprintf(off,"%d %d %d\n",v_count, f_count, e_count);
+
+  for(int i=0; i<v_count; i++) {
+    fprintf(off,"%f %f %f\n",m->vnc_data.v[i].x,m->vnc_data.v[i].y,m->vnc_data.v[i].z);
+  }
+
+  for(int i=0; i<m->face_count; i++) {
+    if(m->triangles[i*3] != -1 && m->triangles[i*3+1] != -1 && m->triangles[i*3+2] != -1)
+      fprintf(off,"%d %d %d %d\n", 3, m->triangles[i*3+0],m->triangles[i*3+1], m->triangles[i*3+2] );
+  }
+
+  fclose(off);
+
+  setlocale(LC_NUMERIC, "");
+  return CLEAP_SUCCESS;
+}
+
 /*******************************END CLEAP FUNCTIONS************************/
 
 int main(int argc, char* argv[])
@@ -493,14 +550,14 @@ int main(int argc, char* argv[])
   float *slabs = (float*)malloc((pop+3) * DIM * sizeof(float));
 
   qsort(DTarray, NUMPOINTS, sizeof(Pair), compareX);  
-  slabs[2*pop] = -1; slabs[2*pop+1] = -1;
-  slabs[2*pop+2] = 2; slabs[2*pop+3] = -1;
-  slabs[2*pop+4] = .5; slabs[2*pop+5] = 2;
+  slabs[2*pop] = X1; slabs[2*pop+1] = Y1;
+  slabs[2*pop+2] = X2; slabs[2*pop+3] = Y2;
+  slabs[2*pop+4] = X3; slabs[2*pop+5] = Y3;
 
   DelaunayTriangulation dt;
 
-  for(int i = 0; i < factor; i++) { 
-    _cleap_mesh *mesh = new _cleap_mesh();
+  for(int i = 0; i < factor; i++) {
+    _cleap_mesh *mesh = new _cleap_mesh(); 
     
     if(cleap_init_no_render() != CLEAP_SUCCESS) {
       fprintf(stderr, "Failed to initialize correcly.\n");
@@ -509,10 +566,10 @@ int main(int argc, char* argv[])
 
     slabPartition(DTarray, slabs, factor, i * pop, pop);    
 
-    //fix this later
-    dt.Initialize(-1, -1, 
-		  2, -1, 
-		  .5, 2);
+    //fix this later - should be generalized to any range of points automatically
+    dt.Initialize(X1, Y1, 
+		  X2, Y2, 
+		  X3, Y3);
     
     //create mesh
     for (int i = 0 ; i < pop; i++)
@@ -536,10 +593,14 @@ int main(int argc, char* argv[])
       fprintf(stderr, "Failed to run Delaunay"); 
       exit(-1);
     }
-    if(i==0)cleap_save_mesh(mesh, "output.off");
+ 
+    if(i==0)DelBoundingTri(mesh, dt, pop); 
 
-    //if(i==0)dt.VerifyResults(slabs, pop); //error check
-    
+    //error check
+    //if(i==0)dt.VerifyResults(slabs, pop);
+    //if(i==0)cleap_save_mesh(mesh, "output.off");
+    //if(i==0)DelBoundingTri(mesh, dt, pop);
+
     //clear out vectors for next round
     dt.Clear();
     cleap_clear_mesh(mesh);
