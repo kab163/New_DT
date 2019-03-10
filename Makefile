@@ -1,26 +1,16 @@
-SRC=DTinput.C 
-SRC2=v2DTinput.C
+SRC=v4X.C 
+SRC2=v4Y.C
 SRC3=HRC_DT.C
-SRCcu=v2DTi.cu
-SRCtest=cleap_test.c
-INSTALL=/usr/local
+INCLUDE=/usr/local/include/cleap-0.3.2
+LIB=/usr/local/lib
 
-default: v3
+default: v4y v4x
 
-prog: $(SRC)
-	g++ -std=c++11 $(SRC) -o dt
+v4y: $(SRC2)
+	g++ -std=c++11 $(SRC2) -o v4y -L$(LIB) -I$(INCLUDE) -lcleap
 
-v2: $(SRC2)
-	g++ -std=c++11 $(SRC2) -o v2 -L$(INSTALL)/lib -I$(INSTALL)/include/cleap-0.3.2 -lcleap
-
-v3: $(SRC3)
-	g++ -std=c++11 $(SRC3) -o v3 -L$(INSTALL)/lib -I$(INSTALL)/include/cleap-0.3.2 -lcleap
-
-app: $(SRCtest)
-	g++ -std=c++11 $(SRCtest) -o app -L$(INSTALL)/lib -I$(INSTALL)/include/cleap-0.3.2 -lcleap
-
-gpu: $(SRCcu)
-	nvcc -arch=sm_35 $(SRCcu) -o gpu -L$(INSTALL)/lib -I$(INSTALL)/include/cleap-0.3.2 -lcleap
+v4x: $(SRC)
+	g++ -std=c++11 $(SRC) -o v4x -L$(LIB) -I$(INCLUDE) -lcleap
 
 clean:
-	rm v3 output.off
+	rm v4y v4x outputMesh.off
