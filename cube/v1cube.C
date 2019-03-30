@@ -13,14 +13,14 @@ using std::vector;
 using std::cerr;
 using std::endl;
 
-#define NUMPOINTS 10
+#define NUMPOINTS 16
 #define DIM 2
 
-#define X1 -1 
+#define X1 -1
 #define Y1 -1
-#define X2 2 
+#define X2 2
 #define Y2 -1
-#define X3 .5 
+#define X3 .5
 #define Y3 2
 
 struct Pair {
@@ -58,55 +58,57 @@ int compareX (const void * a, const void * b)
   return 0;
 }
 
-//Partition the data points into slabs - function defines one slab
-void slabPartition(Pair *DTarray, float *slabs, int factor, int offset, const int pop) {
-  int count = 0; int j = 0;
-  while (count != pop) {
-    slabs[j] = DTarray[offset + count].x;
-    slabs[j + 1] = DTarray[offset + count].y;
-    j+=2; count++;
+//compare function for qsort - sorts along Y axis first
+int compareY (const void * a, const void * b)
+{
+  const Pair* A = (const Pair*) a;
+  const Pair* B = (const Pair*) b;
+  if (A->y > B->y) return 1;
+  else if (A->y < B->y) return -1;
+  else if (A->y == B->y) {
+    if (A->x > B->x) return 1;
+    else if (A->x < B->x) return -1;
+    else if (A->x == B->x) return 0;
   }
+  else return EXIT_FAILURE;
+
+  return 0;
 }
 
-bool IsOnSameSide(float *endPoint1, float *endPoint2, 
-                  float *referencePoint, float *newPoint)
-{
+bool IsOnSameSide(float *endPoint1, float *endPoint2, float *referencePoint, float *newPoint) {
+  //see: http://doubleroot.in/lessons/straight-line/position-of-a-point-relative-to-a-line/#.Wt5H7ZPwalM
+  float m, b;
+  // need to solve equation y = mx + b for endPoint1 
+  // and endPoint2.
 
-    // see: http://doubleroot.in/lessons/straight-line/position-of-a-point-relative-to-a-line/#.Wt5H7ZPwalM
+  if (endPoint1[0] == endPoint2[0])
+  {
+    // infinite slope ... fail
+    return false;
+  }
+  m = (endPoint2[1] - endPoint1[1])/(endPoint2[0] - endPoint1[0]);
+  // y = mx+b
+  // a'x+b'y+c' = 0
+  // mx-y+b = 0;
+  // a' = m, b' = -1, c' = b
+  b = endPoint2[1]-m*endPoint2[0];
+  float a_formula = m;
+  float b_formula = -1;
+  float c_formula = b;
 
+  float val1 = referencePoint[0]*a_formula + referencePoint[1]*b_formula + c_formula;
+  float val2 = newPoint[0]*a_formula + newPoint[1]*b_formula + c_formula;
 
-    float m, b;
-    // need to solve equation y = mx + b for endPoint1 
-    // and endPoint2.
-
-    if (endPoint1[0] == endPoint2[0])
-    {
-        // infinite slope ... fail
-        return false;
-    }
-    m = (endPoint2[1] - endPoint1[1])/(endPoint2[0] - endPoint1[0]);
-    // y = mx+b
-    // a'x+b'y+c' = 0
-    // mx-y+b = 0;
-    // a' = m, b' = -1, c' = b
-    b = endPoint2[1]-m*endPoint2[0];
-    float a_formula = m;
-    float b_formula = -1;
-    float c_formula = b;
-
-    float val1 = referencePoint[0]*a_formula + referencePoint[1]*b_formula + c_formula;
-    float val2 = newPoint[0]*a_formula + newPoint[1]*b_formula + c_formula;
-
-    float product = val1*val2;
-    return (product < 0 ? false : true);
+  float product = val1*val2;
+  return (product < 0 ? false : true);
 }
 
 class OneTriangle
 {
   public:
-    float     p1[2]; 
-    float     p2[2]; 
-    float     p3[2]; 
+    float     p1[2];
+    float     p2[2];
+    float     p3[2];
 
     bool      ContainsPoint(float x, float y);
 };
@@ -134,7 +136,7 @@ class DelaunayTriangulation
     void   AddPoint(float, float);
     int    TriGetSize() {return triangles.size();};
     int    FindFaces(float*, const int);
-    void   VerifyResults(float*, const int);    
+    void   VerifyResults(float*, const int);
     void   Clear();
     //void   WriteOutTriangle(char *filename);
 
@@ -142,46 +144,6 @@ class DelaunayTriangulation
     std::vector<OneTriangle>  triangles;
     std::vector<int>          faces;
 };
-/*
-void DelaunayTriangulation::WriteOutTriangle(char *filename)
-{
-    int ncells = triangles.size();
-cerr << "NUMBER OF TRIANGLE is " << ncells << endl;
-    int *celltypes = new int[ncells];
-    for (int i = 0 ; i < ncells ; i++)
-        celltypes[i] = VISIT_TRIANGLE;
-
-    int dimensions = 3; // always 3 for VTK
-    int vertices_per_cell = 3;
-    int npts = ncells*vertices_per_cell*dimensions;
-    float *pts = new float[npts];
-    int *conn = new int[ncells*vertices_per_cell];
-    int offset = 0;
-    for (int i = 0 ; i < ncells ; i++)
-    {
-        pts[offset+0] = triangles[i].p1[0];
-        pts[offset+1] = triangles[i].p1[1];
-        pts[offset+2] = 0;
-        offset += 3;
-        pts[offset+0] = triangles[i].p2[0];
-        pts[offset+1] = triangles[i].p2[1];
-        pts[offset+2] = 0;
-        offset += 3;
-        pts[offset+0] = triangles[i].p3[0];
-        pts[offset+1] = triangles[i].p3[1];
-        pts[offset+2] = 0;
-        offset += 3;
-    }
-
-    for (int i = 0 ; i < 3*ncells ; i++)
-    {
-        conn[i] = i;
-    }
-    write_unstructured_mesh(filename, 0, npts/3, pts,
-                            ncells, celltypes, conn, 0,
-                            NULL, NULL, NULL, NULL);
-}  
-*/
 
 //constructor to initialize count private variable
 DelaunayTriangulation::DelaunayTriangulation() { count = 0; }
@@ -189,7 +151,7 @@ DelaunayTriangulation::DelaunayTriangulation() { count = 0; }
 //destructor to clear out memory
 DelaunayTriangulation::~DelaunayTriangulation() {
   Clear();
-  triangles.shrink_to_fit(); 
+  triangles.shrink_to_fit();
   faces.shrink_to_fit();
 }
 
@@ -216,16 +178,16 @@ DelaunayTriangulation::AddPoint(float x1, float y1)
       OneTriangle original_triangle = triangles[i];
       // split triangle i into three triangles
       // note: no edge flipping or Delaunay business.
-      // start by replacing triangle in the current list 
+      // start by replacing triangle in the current list
       triangles[i].p3[0] = x1;
-      triangles[i].p3[1] = y1; 
+      triangles[i].p3[1] = y1;
 
       // now add two more triangles.
       OneTriangle new_triangle1;
       new_triangle1.p1[0] = x1;
       new_triangle1.p1[1] = y1;
       new_triangle1.p2[0] = original_triangle.p2[0];
-      new_triangle1.p2[1] = original_triangle.p2[1]; 
+      new_triangle1.p2[1] = original_triangle.p2[1];
       new_triangle1.p3[0] = original_triangle.p3[0];
       new_triangle1.p3[1] = original_triangle.p3[1];
       triangles.push_back(new_triangle1);
@@ -245,33 +207,33 @@ DelaunayTriangulation::AddPoint(float x1, float y1)
 }
 
 int
-DelaunayTriangulation::FindFaces(float* slabs, const int pop) { 
+DelaunayTriangulation::FindFaces(float* cubes, const int pop) {
   int size = triangles.size();
 
-  for(int i = 0; i < size; i++) {   
+  for(int i = 0; i < size; i++) {
     for(int s = 0; s < (pop+3); s++) {
-      if(slabs[2*s] == triangles[i].p1[0] && slabs[2*s +1] == triangles[i].p1[1]) {
+      if(cubes[2*s] == triangles[i].p1[0] && cubes[2*s +1] == triangles[i].p1[1]) {
         faces.push_back(s);
       }
-      if(slabs[2*s] == triangles[i].p2[0] && slabs[2*s +1] == triangles[i].p2[1]) {
-	faces.push_back(s);
+      if(cubes[2*s] == triangles[i].p2[0] && cubes[2*s +1] == triangles[i].p2[1]) {
+        faces.push_back(s);
       }
-      if(slabs[2*s] == triangles[i].p3[0] && slabs[2*s +1] == triangles[i].p3[1]) {
-        faces.push_back(s);	
+      if(cubes[2*s] == triangles[i].p3[0] && cubes[2*s +1] == triangles[i].p3[1]) {
+        faces.push_back(s);
       }
-    } 
-  } 
+    }
+  }
 }
 
 //to double check results
-void 
-DelaunayTriangulation::VerifyResults (float* slabs, const int pop) {
+void
+DelaunayTriangulation::VerifyResults (float* cubes, const int pop) {
   for(int i = 0; i < triangles.size(); i++) {
     printf("Triangle %d: %lf, %lf\n %lf, %lf\n %lf, %lf\n", i+1, triangles[i].p1[0], triangles[i].p1[1], triangles[i].p2[0], triangles[i].p2[1], triangles[i].p3[0], triangles[i].p3[1]);
   }
 
   for(int i = 0; i < (pop + 3); i++) {
-    printf("\nFor vertex %d: xcoord: %lf, ycoord: %lf \n", i, slabs[2*i], slabs[2*i+1]);
+    printf("\nFor vertex %d: xcoord: %lf, ycoord: %lf \n", i, cubes[2*i], cubes[2*i+1]);
   }
 
   for(int i = 0; i < faces.size(); i+=3) {
@@ -283,11 +245,30 @@ DelaunayTriangulation::VerifyResults (float* slabs, const int pop) {
 
 void
 DelaunayTriangulation::Clear() {
-  if(triangles.size() > 0)  
+  if(triangles.size() > 0)
     triangles.clear();
   if(faces.size() > 0)
     faces.clear();
 }
+
+//Partition the data points into cubes - function defines one cube
+void cubePartition(float *slices, float* cubes, int factor, int offset, const int pop) {
+  for(int i = 0; i < pop; i+=2) {
+    cubes[i] = slices[offset + i];
+    cubes[i + 1] = slices[offset + i + 1];
+  }
+}
+
+//Partition the data points into slices - function defines one slice
+void slicePartition(Pair *DTarray, float *slices, int factor, int offset, const int pop) {
+  int count = 0; int j = 0;
+  while (count != pop) {
+    slices[j] = DTarray[offset + count].x;
+    slices[j + 1] = DTarray[offset + count].y;
+    j+=2; count++;
+  }
+}
+
 /*************************BEGIN CLEAP FUNCTIONS*******************/
 
 typedef std::pair<int, int> pairArco;
@@ -311,55 +292,55 @@ CLEAP_RESULT _cleap_generate_edges_HASH(_cleap_mesh *m, DelaunayTriangulation dt
   int k_sec[3] = {1, 2, 2};
   int op_sec[3] = {2, 1, 0};
   int j ,k, op;
-	
+
   for(int i=0; i<m->face_count; i++) {
     if( face_type == 3 ){
       // scan the three triangle indexes
       m->triangles[i*3] = dt.faces[i*3];
       m->triangles[i*3+1] = dt.faces[i*3+1];
-      m->triangles[i*3+2] = dt.faces[i*3+2];	
+      m->triangles[i*3+2] = dt.faces[i*3+2];
       
       //Building Edges
       for(int q=0; q<3; q++){
         j=j_sec[q], k=k_sec[q], op=op_sec[q];
-	// always the higher first
-	if( m->triangles[i*face_type+j] < m->triangles[i*face_type+k]){ 
-	  k = j;	
-	  j = k_sec[q]; 
-	}
-	// ok, first index already existed, check if the second exists or not
-	std::tr1::unordered_map<int, _tmp_edge> *second_hash = &root_hash[m->triangles[i*face_type+j]];
-	hit = second_hash->find(m->triangles[i*face_type+k]);
-	
-	if( hit != second_hash->end() ){
-	  // the edge already exists, then fill the remaining info
-	  aux_tmp_edge = &(hit->second);
-	  aux_tmp_edge->b1 = i*face_type+j;
-	  aux_tmp_edge->b2 = i*face_type+k;
-	  aux_tmp_edge->op2 = i*face_type+op;
-	}
-	else{
-	  // create a new edge	
-	  aux_tmp_edge = &(*second_hash)[m->triangles[i*face_type+k]];					// create the low value on secondary_hash	
-	  aux_tmp_edge->n1 = m->triangles[i*face_type+j];
-	  aux_tmp_edge->n2 = m->triangles[i*face_type+k];
-	  aux_tmp_edge->a1 = i*face_type+j;
-	  aux_tmp_edge->a2 = i*face_type+k;
-	  aux_tmp_edge->b1 = -1;
-	  aux_tmp_edge->b2 = -1;
-	  aux_tmp_edge->op1 = i*face_type+op;
-	  aux_tmp_edge->op2 = -1;
-	  aux_tmp_edge->id = edge_vector.size();
-	  edge_vector.push_back( aux_tmp_edge );
-       	}
-      }  
+        // always the higher first
+        if( m->triangles[i*face_type+j] < m->triangles[i*face_type+k]){
+          k = j;
+          j = k_sec[q];
+        }
+        // ok, first index already existed, check if the second exists or not
+        std::tr1::unordered_map<int, _tmp_edge> *second_hash = &root_hash[m->triangles[i*face_type+j]];
+        hit = second_hash->find(m->triangles[i*face_type+k]);
+
+        if( hit != second_hash->end() ){
+          // the edge already exists, then fill the remaining info
+          aux_tmp_edge = &(hit->second);
+          aux_tmp_edge->b1 = i*face_type+j;
+          aux_tmp_edge->b2 = i*face_type+k;
+          aux_tmp_edge->op2 = i*face_type+op;
+        }
+        else{
+          // create a new edge  
+          aux_tmp_edge = &(*second_hash)[m->triangles[i*face_type+k]];                                  // create the low value on secondary_hash       
+          aux_tmp_edge->n1 = m->triangles[i*face_type+j];
+          aux_tmp_edge->n2 = m->triangles[i*face_type+k];
+          aux_tmp_edge->a1 = i*face_type+j;
+          aux_tmp_edge->a2 = i*face_type+k;
+          aux_tmp_edge->b1 = -1;
+          aux_tmp_edge->b2 = -1;
+          aux_tmp_edge->op1 = i*face_type+op;
+          aux_tmp_edge->op2 = -1;
+          aux_tmp_edge->id = edge_vector.size();
+          edge_vector.push_back( aux_tmp_edge );
+        }
+      }
     }
     else {
       printf("CLEAP::load_mesh::error IO00::mesh has other types of polygons, need triangle only\n");
       free(m->vnc_data.v);
       free(m->vnc_data.n);
       free(m->vnc_data.c);
-      free(m->triangles); 
+      free(m->triangles);
       m->status = CLEAP_FAILURE;
       return CLEAP_FAILURE;
     }
@@ -386,7 +367,6 @@ CLEAP_RESULT _cleap_generate_edges_HASH(_cleap_mesh *m, DelaunayTriangulation dt
     m->vnc_data.n[m->triangles[i*face+2]].x += normal.x;
     m->vnc_data.n[m->triangles[i*face+2]].y += normal.y;
     m->vnc_data.n[m->triangles[i*face+2]].z += normal.z;
-
     // CANSKIP:: progress bar code, nothing important
     if( i > pbFraction*cont ){
       prog += 0.25;
@@ -395,7 +375,7 @@ CLEAP_RESULT _cleap_generate_edges_HASH(_cleap_mesh *m, DelaunayTriangulation dt
       //printf("%.0f%%...", prog*100.0); fflush(stdout);
     }
   }
-	
+
   m->processed_edges = 0;
   // CLEAP::MESH:: update the edge count, now after being calculated
   m->edge_count = edge_vector.size();
@@ -415,18 +395,18 @@ CLEAP_RESULT _cleap_generate_edges_HASH(_cleap_mesh *m, DelaunayTriangulation dt
   //printf("ok\n"); fflush(stdout);
 }
 
-CLEAP_RESULT load_mesh_host(const int pop, float* slabs, _cleap_mesh *m, DelaunayTriangulation dt){
+CLEAP_RESULT load_mesh_host(const int pop, float* cubes, _cleap_mesh *m, DelaunayTriangulation dt){
   int v_count = pop+3;
   int f_count = dt.TriGetSize();
   int e_count = v_count + f_count -2;
   int io_val = 0;
   char line[255];
-  setlocale(LC_NUMERIC, "POSIX");	// IO :: necessary for other languajes.
+  setlocale(LC_NUMERIC, "POSIX");       // IO :: necessary for other languajes.
 
   m->vertex_count = v_count;
   m->edge_count = e_count;
   m->face_count = f_count;
-  
+
   _cleap_reset_minmax(m);
 
   // CLEAP:: malloc host triangles array
@@ -440,16 +420,17 @@ CLEAP_RESULT load_mesh_host(const int pop, float* slabs, _cleap_mesh *m, Delauna
   float cont=25.0f;
   float pbFraction = (float)((float)v_count+(float)f_count)/(100.0f);
   //printf("CLEAP::load_mesh::reading...0%%...");
-  
+
   // IO:: PARSE VERTEX DATA
   for(int i=0; i<v_count; i++) {
-    m->vnc_data.v[i].x = slabs[2*i];
-    m->vnc_data.v[i].y = slabs[2*i+1];
+    m->vnc_data.v[i].x = cubes[2*i];
+    m->vnc_data.v[i].y = cubes[2*i+1];
     m->vnc_data.v[i].z = 0; //only doing 2D for now
     m->vnc_data.v[i].w = 1.0f;
 
     // normals
     m->vnc_data.n[i] = make_float4(0.0f, 0.0f, 0.0f, 1.0f);
+
     // maximum values
     if (m->vnc_data.v[i].x > m->max_coords.x) m->max_coords.x=m->vnc_data.v[i].x;
     if (m->vnc_data.v[i].y > m->max_coords.y) m->max_coords.y=m->vnc_data.v[i].y;
@@ -457,7 +438,7 @@ CLEAP_RESULT load_mesh_host(const int pop, float* slabs, _cleap_mesh *m, Delauna
     if (m->vnc_data.v[i].x < m->min_coords.x) m->min_coords.x=m->vnc_data.v[i].x;
     if (m->vnc_data.v[i].y < m->min_coords.y) m->min_coords.y=m->vnc_data.v[i].y;
     if (m->vnc_data.v[i].z < m->min_coords.z) m->min_coords.z=m->vnc_data.v[i].z;
-		
+
     if( i > pbFraction*cont ){
       prog += 0.25;
       cont += 25.0f;
@@ -475,7 +456,7 @@ CLEAP_RESULT load_mesh_host(const int pop, float* slabs, _cleap_mesh *m, Delauna
   return CLEAP_SUCCESS;
 }
 
-CLEAP_RESULT DelBoundingTri(_cleap_mesh *m, DelaunayTriangulation dt, const int pop) { 
+CLEAP_RESULT DelBoundingTri(_cleap_mesh *m, DelaunayTriangulation dt, const int pop) {
   int v_count, f_count, e_count;
   v_count = m->vertex_count;
   f_count = m->face_count;
@@ -488,16 +469,16 @@ CLEAP_RESULT DelBoundingTri(_cleap_mesh *m, DelaunayTriangulation dt, const int 
   FILE *off = fopen("outputMesh.off", "w");
 
   for(int i = 0; i < m->face_count; i++) {
-    if(m->triangles[3*i] == pop || m->triangles[3*i] == pop+1 || m->triangles[3*i] == pop+2) { 
+    if(m->triangles[3*i] == pop || m->triangles[3*i] == pop+1 || m->triangles[3*i] == pop+2) {
       m->triangles[3*i] = -1; m->triangles[3*i+1] = -1; m->triangles[3*i+2] = -1; //delete this triangle
-      f_count--; //subtract one from face count 
+      f_count--; //subtract one from face count
     } else if(m->triangles[3*i+1] == pop || m->triangles[3*i+1] == pop+1 || m->triangles[3*i+1] == pop+2) {
       m->triangles[3*i] = -1; m->triangles[3*i+1] = -1; m->triangles[3*i+2] = -1; //delete this triangle
-      f_count--; //subtract one from face count 
+      f_count--; //subtract one from face count
     } else if(m->triangles[3*i+2] == pop || m->triangles[3*i+2] == pop+1 || m->triangles[3*i+2] == pop+2) {
       m->triangles[3*i] = -1; m->triangles[3*i+1] = -1; m->triangles[3*i+2] = -1; //delete this triangle
-      f_count--; //subtract one from face count 
-    } 
+      f_count--; //subtract one from face count
+    }
   }
 
   //no longer have boundary triangle, subtract the vertices
@@ -526,90 +507,93 @@ CLEAP_RESULT DelBoundingTri(_cleap_mesh *m, DelaunayTriangulation dt, const int 
 
 /*******************************END CLEAP FUNCTIONS************************/
 
-int main(int argc, char* argv[])
-{
+int main(int argc, char* argv[]) {
   if (argc < 2) {
     fprintf(stderr, "usage: <exe>, <int: factor>\n");
     return -1;
   }
 
+  //factor: affects how big or small the data partition groups will be.
   int factor = atoi(argv[1]);
   if (factor < 0) {
     fprintf(stderr, "factor shouldn't be less than zero\n");
     exit(-1);
   }
-  if (NUMPOINTS % factor != 0) {
-    fprintf(stderr, "factor must be divisible by total number of points\n");
+ 
+  if (NUMPOINTS % (factor * factor) != 0) { //if N % (F * F) = 0, then N its also true that N % F = 0
+    fprintf(stderr, "factor * factor must also be divisible by total number of points for cubes to work\n");
     exit(-1);
   }
-  
+
   const int pop = NUMPOINTS / factor;
   Pair *DTarray = (Pair *)malloc(NUMPOINTS * sizeof(Pair));
   PointGenerator(DTarray);
 
-  float *slabs = (float*)malloc((pop+3) * DIM * sizeof(float));
-
-  qsort(DTarray, NUMPOINTS, sizeof(Pair), compareX);  
-  slabs[2*pop] = X1; slabs[2*pop+1] = Y1;
-  slabs[2*pop+2] = X2; slabs[2*pop+3] = Y2;
-  slabs[2*pop+4] = X3; slabs[2*pop+5] = Y3;
-
+  float *slices = (float*)malloc(pop * DIM * sizeof(float));
+  float *cubes = (float*)malloc(pop / factor * DIM * sizeof(float));
+ 
   DelaunayTriangulation dt;
 
-  for(int i = 0; i < factor; i++) {
-    _cleap_mesh *mesh = new _cleap_mesh(); 
-    
+  qsort(DTarray, NUMPOINTS, sizeof(Pair), compareY);
+  //slicing(DTarray, slices, factor, pop); 
+  cubes[2*(pop/factor)] = X1; cubes[2*(pop/factor)+1] = Y1;
+  cubes[2*(pop/factor)+2] = X2; cubes[2*(pop/factor)+3] = Y2;
+  cubes[2*(pop/factor)+4] = X3; cubes[2*(pop/factor)+5] = Y3;
+
+  for (int i = 0; i < factor; i++) {
+    _cleap_mesh *mesh = new _cleap_mesh();
+
     if(cleap_init_no_render() != CLEAP_SUCCESS) {
       fprintf(stderr, "Failed to initialize correcly.\n");
       exit(-1);
     }
 
-    slabPartition(DTarray, slabs, factor, i * pop, pop);    
-
+    slicePartition(DTarray, slices, factor, i * pop, pop);
+    cubePartition(slices, cubes, factor, i * pop, pop); //will make factor # of slabs in each slice (cubes)  
+  
     //fix this later - should be generalized to any range of points automatically
-    dt.Initialize(X1, Y1, 
-		  X2, Y2, 
-		  X3, Y3);
-    
+    dt.Initialize(X1, Y1,
+                  X2, Y2,
+                  X3, Y3);
+
     //create mesh
-    for (int i = 0 ; i < pop; i++)
-      dt.AddPoint(slabs[2*i], slabs[2*i+1]);
+    for (int i = 0 ; i < (pop/factor); i++)
+      dt.AddPoint(cubes[2*i], cubes[2*i+1]);
 
     //find faces of triangles in mesh
-    dt.FindFaces(slabs, pop); 
+    dt.FindFaces(cubes, pop/factor);
 
     //load cleap mesh
-    if(load_mesh_host(pop, slabs, mesh, dt) != CLEAP_SUCCESS) {
-      fprintf(stderr, "Failed to load mesh on host"); 
+    if(load_mesh_host(pop/factor, cubes, mesh, dt) != CLEAP_SUCCESS) {
+      fprintf(stderr, "Failed to load mesh on host");
       exit(-1);
     }
     if(_cleap_device_load_mesh(mesh) != CLEAP_SUCCESS) {
-      fprintf(stderr, "Failed to load mesh on device"); 
+      fprintf(stderr, "Failed to load mesh on device");
       exit(-1);
     }
 
     //call Delaunay transformation on mesh
     if(cleap_delaunay_transformation(mesh, CLEAP_MODE_2D) != CLEAP_SUCCESS) {
-      fprintf(stderr, "Failed to run Delaunay"); 
+      fprintf(stderr, "Failed to run Delaunay");
       exit(-1);
     }
- 
-    if(i==0)DelBoundingTri(mesh, dt, pop); 
+
+    if(i==0)DelBoundingTri(mesh, dt, pop/factor);
 
     //error check
-    //if(i==0)dt.VerifyResults(slabs, pop);
+    if(i==0)dt.VerifyResults(cubes, pop/factor);
     //if(i==0)cleap_save_mesh(mesh, "output.off");
     //if(i==0)DelBoundingTri(mesh, dt, pop);
 
     //clear out vectors for next round
     dt.Clear();
     cleap_clear_mesh(mesh);
-  } 
+  }
 
-  //DT.WriteOutTriangle("kristi.vtk");
-
-  free(slabs); 
+  free(slices);
+  free(cubes); 
   free(DTarray);
-
   return 0;
 }
+
