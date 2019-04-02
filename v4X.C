@@ -16,12 +16,8 @@ using std::endl;
 #define NUMPOINTS 10
 #define DIM 2
 
-#define X1 -1 
-#define Y1 -1
-#define X2 2 
-#define Y2 -1
-#define X3 .5 
-#define Y3 2
+#define BOUNDS 1000000
+#define BOUNDS2 1000000.0
 
 struct Pair {
   float x;
@@ -32,13 +28,30 @@ struct Pair {
 void PointGenerator(Pair* DTarray) {
   for(int j = 0; j < NUMPOINTS; j++) {
 
-    float rand_value = rand() % 1000000 / 1000000.0;
+    float rand_value = rand() % BOUNDS / BOUNDS2;
     DTarray[j].x = rand_value;
 
-    rand_value = rand() % 1000000 / 1000000.0;
+    rand_value = rand() % BOUNDS / BOUNDS2;
     DTarray[j].y = rand_value;
   }
 
+}
+
+float* findBounds () {
+  float range = BOUNDS / BOUNDS2;
+  
+  float* bbox[6]; //2 points for each vertex of bounding triangle, 6 total
+  
+  bbox[0] = -range; //X1
+  bbox[1] = -range; //Y1
+
+  bbox[2] = 2 * range; //X2
+  bbox[3] = -range; //Y2
+
+  bbox[4] = .5 * range; //X3
+  bbox[5] = 2 * range; //Y3
+
+  return bbox;
 }
 
 //compare function for qsort - sorts along X axis first
@@ -546,13 +559,14 @@ int main(int argc, char* argv[])
   const int pop = NUMPOINTS / factor;
   Pair *DTarray = (Pair *)malloc(NUMPOINTS * sizeof(Pair));
   PointGenerator(DTarray);
+  float* bbox = findBounds();
 
   float *slabs = (float*)malloc((pop+3) * DIM * sizeof(float));
 
   qsort(DTarray, NUMPOINTS, sizeof(Pair), compareX);  
-  slabs[2*pop] = X1; slabs[2*pop+1] = Y1;
-  slabs[2*pop+2] = X2; slabs[2*pop+3] = Y2;
-  slabs[2*pop+4] = X3; slabs[2*pop+5] = Y3;
+  slabs[2*pop] = bbox[0]; slabs[2*pop+1] = bbox[1];
+  slabs[2*pop+2] = bbox[2]; slabs[2*pop+3] = bbox[3];
+  slabs[2*pop+4] = bbox[4]; slabs[2*pop+5] = bbox[5];
 
   DelaunayTriangulation dt;
 
@@ -567,9 +581,9 @@ int main(int argc, char* argv[])
     slabPartition(DTarray, slabs, factor, i * pop, pop);    
 
     //fix this later - should be generalized to any range of points automatically
-    dt.Initialize(X1, Y1, 
-		  X2, Y2, 
-		  X3, Y3);
+    dt.Initialize(bbox[0], bbox[1], 
+		  bbox[2], bbox[3], 
+		  bbox[4], bbox[5];
     
     //create mesh
     for (int i = 0 ; i < pop; i++)
@@ -594,8 +608,6 @@ int main(int argc, char* argv[])
       exit(-1);
     }
  
-    if(i==0)DelBoundingTri(mesh, dt, pop); 
-
     //error check
     //if(i==0)dt.VerifyResults(slabs, pop);
     //if(i==0)cleap_save_mesh(mesh, "output.off");
@@ -607,6 +619,7 @@ int main(int argc, char* argv[])
   } 
 
   //DT.WriteOutTriangle("kristi.vtk");
+  //DelBoundingTri(mesh, dt, pop); //TODO: only delete bounding triangle of final solution
 
   free(slabs); 
   free(DTarray);
