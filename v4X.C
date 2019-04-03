@@ -577,8 +577,7 @@ int main(int argc, char* argv[])
     }
 
     slabPartition(DTarray, slabs, factor, i * pop, pop);    
-
-    //fix this later - should be generalized to any range of points automatically
+ 
     dt.Initialize(bbox[0], bbox[1], 
 		  bbox[2], bbox[3], 
 		  bbox[4], bbox[5]);
