@@ -559,65 +559,76 @@ int main(int argc, char* argv[])
   float bbox[6]; //2 points for each vertex of bounding triangle, 6 total
   findBounds(bbox);
 
-  float *slabs = (float*)malloc((pop+3) * DIM * sizeof(float));
+  //creating (factor) number of arrays each with (numpoints/factor) points, for a total of (numpoints) points
+  float **slabs = (float**)malloc(factor * sizeof(float*)); //array of slabs
+  for(int i = 0; i < factor; i++)
+    slabs[i] = (float*)malloc((pop+3) * DIM * sizeof(float));
 
-  qsort(DTarray, NUMPOINTS, sizeof(Pair), compareX);  
-  slabs[2*pop] = bbox[0]; slabs[2*pop+1] = bbox[1];
-  slabs[2*pop+2] = bbox[2]; slabs[2*pop+3] = bbox[3];
-  slabs[2*pop+4] = bbox[4]; slabs[2*pop+5] = bbox[5];
+  qsort(DTarray, NUMPOINTS, sizeof(Pair), compareX); //sort along X axis, definition of a slab 
+  
+  //each slab in my array of slabs should have the boundary triangle defined, placed at the end of each
+  for(int i = 0; i < factor; i++) {
+    slabs[i][2*pop] = bbox[0]; slabs[i][2*pop+1] = bbox[1];
+    slabs[i][2*pop+2] = bbox[2]; slabs[i][2*pop+3] = bbox[3];
+    slabs[i][2*pop+4] = bbox[4]; slabs[i][2*pop+5] = bbox[5];
+  }
 
-  DelaunayTriangulation dt;
+  DelaunayTriangulation dt[factor];
+  _cleap_mesh *mesh[factor];
 
   for(int i = 0; i < factor; i++) {
-    _cleap_mesh *mesh = new _cleap_mesh(); 
+    mesh[i] = new _cleap_mesh(); 
     
     if(cleap_init_no_render() != CLEAP_SUCCESS) {
       fprintf(stderr, "Failed to initialize correcly.\n");
       exit(-1);
     }
 
-    slabPartition(DTarray, slabs, factor, i * pop, pop);    
+    slabPartition(DTarray, slabs[i], factor, i * pop, pop);    
  
-    dt.Initialize(bbox[0], bbox[1], 
+    dt[i].Initialize(bbox[0], bbox[1], 
 		  bbox[2], bbox[3], 
 		  bbox[4], bbox[5]);
     
     //create mesh
     for (int i = 0 ; i < pop; i++)
-      dt.AddPoint(slabs[2*i], slabs[2*i+1]);
+      dt[i].AddPoint(slabs[i][2*i], slabs[i][2*i+1]);
 
     //find faces of triangles in mesh
-    dt.FindFaces(slabs, pop); 
+    dt[i].FindFaces(slabs[i], pop); 
 
     //load cleap mesh
-    if(load_mesh_host(pop, slabs, mesh, dt) != CLEAP_SUCCESS) {
+    if(load_mesh_host(pop, slabs[i], mesh[i], dt[i]) != CLEAP_SUCCESS) {
       fprintf(stderr, "Failed to load mesh on host"); 
       exit(-1);
     }
-    if(_cleap_device_load_mesh(mesh) != CLEAP_SUCCESS) {
+    if(_cleap_device_load_mesh(mesh[i]) != CLEAP_SUCCESS) {
       fprintf(stderr, "Failed to load mesh on device"); 
       exit(-1);
     }
 
     //call Delaunay transformation on mesh
-    if(cleap_delaunay_transformation(mesh, CLEAP_MODE_2D) != CLEAP_SUCCESS) {
+    if(cleap_delaunay_transformation(mesh[i], CLEAP_MODE_2D) != CLEAP_SUCCESS) {
       fprintf(stderr, "Failed to run Delaunay"); 
       exit(-1);
     }
  
     //error check
     //if(i==0)dt.VerifyResults(slabs, pop);
-    if(i==1)cleap_save_mesh(mesh, "output.off");
+    if(i==1)cleap_save_mesh(mesh[i], "output.off");
     //if(i==0)DelBoundingTri(mesh, dt, pop);
 
     //clear out vectors for next round
-    dt.Clear();
-    cleap_clear_mesh(mesh);
+    //dt[i].Clear();
+    //cleap_clear_mesh(mesh);
   } 
 
   //DT.WriteOutTriangle("kristi.vtk");
   //DelBoundingTri(mesh, dt, pop); //TODO: only delete bounding triangle of final solution
 
+
+  for(int i = 0; i < factor; i++)
+    free(slabs[i]);
   free(slabs); 
   free(DTarray);
 
