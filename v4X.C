@@ -13,7 +13,7 @@ using std::vector;
 using std::cerr;
 using std::endl;
 
-#define NUMPOINTS 100
+#define NUMPOINTS 10
 #define DIM 2
 
 #define BOUNDS 1000
@@ -543,6 +543,7 @@ int main(int argc, char* argv[])
   }
 
   int factor = atoi(argv[1]);
+  char name[32];
   if (factor < 0) {
     fprintf(stderr, "factor shouldn't be less than zero\n");
     exit(-1);
@@ -576,51 +577,52 @@ int main(int argc, char* argv[])
   DelaunayTriangulation dt[factor];
   _cleap_mesh *mesh[factor];
 
-  for(int i = 0; i < factor; i++) {
-    mesh[i] = new _cleap_mesh(); 
+  for(int f = 0; f < factor; f++) {
+    mesh[f] = new _cleap_mesh(); 
     
     if(cleap_init_no_render() != CLEAP_SUCCESS) {
       fprintf(stderr, "Failed to initialize correcly.\n");
       exit(-1);
     }
 
-    slabPartition(DTarray, slabs[i], factor, i * pop, pop);    
+    slabPartition(DTarray, slabs[f], factor, f * pop, pop);    
  
-    dt[i].Initialize(bbox[0], bbox[1], 
+    dt[f].Initialize(bbox[0], bbox[1], 
 		  bbox[2], bbox[3], 
 		  bbox[4], bbox[5]);
     
     //create mesh
-    for (int i = 0 ; i < pop; i++)
-      dt[i].AddPoint(slabs[i][2*i], slabs[i][2*i+1]);
+    for (int p = 0 ; p < pop; p++)
+      dt[f].AddPoint(slabs[f][2*p], slabs[f][2*p+1]);
 
     //find faces of triangles in mesh
-    dt[i].FindFaces(slabs[i], pop); 
+    dt[f].FindFaces(slabs[f], pop); 
 
     //load cleap mesh
-    if(load_mesh_host(pop, slabs[i], mesh[i], dt[i]) != CLEAP_SUCCESS) {
+    if(load_mesh_host(pop, slabs[f], mesh[f], dt[f]) != CLEAP_SUCCESS) {
       fprintf(stderr, "Failed to load mesh on host"); 
       exit(-1);
     }
-    if(_cleap_device_load_mesh(mesh[i]) != CLEAP_SUCCESS) {
+    if(_cleap_device_load_mesh(mesh[f]) != CLEAP_SUCCESS) {
       fprintf(stderr, "Failed to load mesh on device"); 
       exit(-1);
     }
 
     //call Delaunay transformation on mesh
-    if(cleap_delaunay_transformation(mesh[i], CLEAP_MODE_2D) != CLEAP_SUCCESS) {
+    if(cleap_delaunay_transformation(mesh[f], CLEAP_MODE_2D) != CLEAP_SUCCESS) {
       fprintf(stderr, "Failed to run Delaunay"); 
       exit(-1);
     }
  
     //error check
     //if(i==0)dt.VerifyResults(slabs, pop);
-    if(i==1)cleap_save_mesh(mesh[i], "output.off");
+    sprintf(name, "output%d.off", f);
+    cleap_save_mesh(mesh[f], name);
     //if(i==0)DelBoundingTri(mesh, dt, pop);
 
     //clear out vectors for next round
-    //dt[i].Clear();
-    //cleap_clear_mesh(mesh);
+    dt[f].Clear();
+    cleap_clear_mesh(mesh[f]);
   } 
 
   //DT.WriteOutTriangle("kristi.vtk");
